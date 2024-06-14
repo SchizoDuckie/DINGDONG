@@ -10,10 +10,12 @@ unsigned long dingDongPreviousMillis = 0;
 unsigned long cooldownStartMillis = 0;  // For cooldown
 int dingDongX = 160;  // Initial position for "DING DONG"
 int previousDingDongX = 160;
+int triggerAtNullValuesDetected = 20;
 
 // Declare the external variables from the header file
 extern bool dingDongActive;
 extern bool servoActive;
+
 
 void setupDoorbell() {
     pinMode(analogPin, INPUT);
@@ -42,17 +44,18 @@ void updateDoorbell(int servoMinAngle, int servoMaxAngle, int servoStep, long di
     }
 
     // Detection logic
-    if (graphVal < 10) {  // Adjust threshold for your specific use case
+    if (graphVal == 0) {  // Adjust threshold for your specific use case
         nullCounter++;
-        if (nullCounter > 5 && !servoActive && !dingDongActive) {
+        if (nullCounter > triggerAtNullValuesDetected && !servoActive && !dingDongActive) {
             Serial.println("DING DONG!");
             dingDongActive = true;
             dingDongStartMillis = millis();
             nullCounter = 0;
             servoActive = true;  // Activate the servo
             digitalWrite(servoPin, HIGH); // Power on the servo
+            notificationSent = false;
             cooldownStartMillis = currentMillis; // Start cooldown
-            triggerNotification();
+            
         }
     } else {
         nullCounter = 0;
@@ -60,6 +63,7 @@ void updateDoorbell(int servoMinAngle, int servoMaxAngle, int servoStep, long di
 
     // Flash "DING DONG" if active
     if (dingDongActive) {
+        
         if (currentMillis - dingDongStartMillis < dingDongDuration) {
             if (currentMillis - dingDongPreviousMillis >= dingDongInterval) {
                 dingDongPreviousMillis = currentMillis;

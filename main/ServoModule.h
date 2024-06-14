@@ -10,6 +10,7 @@ extern int servoMaxAngle;
 extern int servoStep;
 const long servoInterval = 2;  // Interval for servo update in milliseconds
 extern bool servoActive;
+extern bool notificationSent = false;
 
 // Function declarations
 void setupServo();

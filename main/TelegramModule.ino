@@ -6,33 +6,38 @@
 std::vector<String> subscribers;
 long lastUpdateId = 0;  // Initialize the last update ID to 0
 
+
 void setupTelegram() {
     // Load subscribers from config
     loadSubscribers(subscribers);
 }
-
-void sendTelegramMessage(const char* message, const String& chatID) {
+void sendTelegramMessageTask(void* parameter) {
+    MessageParams* params = static_cast<MessageParams*>(parameter);
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi not connected");
+        delete params; // Clean up allocated memory
+        vTaskDelete(NULL);
         return;
     }
 
     WiFiClientSecure client;
     client.setInsecure();
-    
+
     const char* server = "api.telegram.org";
 
     if (!client.connect(server, 443)) {
         Serial.println("Connection to Telegram failed");
+        delete params; // Clean up allocated memory
+        vTaskDelete(NULL);
         return;
     }
 
     String url = "/bot";
     url += TELEGRAM_BOT_TOKEN;
     url += "/sendMessage?chat_id=";
-    url += chatID;
+    url += params->chatID;
     url += "&text=";
-    url += message;
+    url += params->message;
 
     client.print(String("GET ") + url + " HTTP/1.1\r\n" +
                  "Host: " + server + "\r\n" +
@@ -47,13 +52,24 @@ void sendTelegramMessage(const char* message, const String& chatID) {
     }
     String line = client.readStringUntil('\n');
     Serial.println(line);
+
+    delete params; // Clean up allocated memory
+    vTaskDelete(NULL);
 }
 
 void triggerNotification() {
-    for (const auto& chatID : subscribers) {
+    for (auto it = subscribers.begin(); it != subscribers.end(); ) {
+        const auto& chatID = *it;
+        if (chatID.isEmpty()) {
+            it = subscribers.erase(it); // Remove empty chatID and update iterator
+            continue;
+        }
         Serial.print("Notifying via Telegram, chatID: ");
         Serial.println(chatID);
-        sendTelegramMessage("DING DONG! Er staat iemand voor de deur!.", chatID);
+
+        MessageParams* params = new MessageParams{"DING DONG! Er staat iemand voor de deur!.", chatID};
+        xTaskCreate(sendTelegramMessageTask, "SendTelegramMessage", 4096, params, 1, NULL);
+        ++it; // Move to the next subscriber
     }
 }
 
@@ -125,25 +141,28 @@ void getUpdates() {
         String chat_id = result["message"]["chat"]["id"].as<String>();
         String text = result["message"]["text"].as<String>();
 
-        if (text.equalsIgnoreCase("geef deurbel")) {
+        if (text.equalsIgnoreCase("geef deurbel") || text.equalsIgnoreCase("/start")) {
             addSubscriber(chat_id);
             saveSubscribers(subscribers);  // Save after adding
-        } else if (text.equalsIgnoreCase("rot op") || text.equalsIgnoreCase("hou je bek") || text.equalsIgnoreCase("bakkes")) {
+        } else if (text.equalsIgnoreCase("rot op") || text.equalsIgnoreCase("hou je bek") || text.equalsIgnoreCase("bakkes") || text.equalsIgnoreCase("/stop")) {
             removeSubscriber(chat_id);
-            sendTelegramMessage("Okee doei.", chat_id);
             saveSubscribers(subscribers);  // Save after removing
         }
     }
 }
 
 void addSubscriber(const String& chatID) {
-    if (std::find(subscribers.begin(), subscribers.end(), chatID) == subscribers.end()) {
+    if (!chatID.isEmpty() && std::find(subscribers.begin(), subscribers.end(), chatID) == subscribers.end()) {
         subscribers.push_back(chatID);
+        MessageParams* params = new MessageParams{"Okay, je krijgt nu deurbel notificaties", chatID};
+        xTaskCreate(sendTelegramMessageTask, "SendTelegramMessage", 4096, params, 1, NULL);
     }
 }
 
 void removeSubscriber(const String& chatID) {
     auto it = std::remove(subscribers.begin(), subscribers.end(), chatID);
+    MessageParams* params = new MessageParams{"Okay doei", chatID};
+    xTaskCreate(sendTelegramMessageTask, "SendTelegramMessage", 4096, params, 1, NULL);
     if (it != subscribers.end()) {
         subscribers.erase(it, subscribers.end());
     }

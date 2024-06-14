@@ -21,6 +21,11 @@ void addSubscriber(const String& chatID);
 void removeSubscriber(const String& chatID);
 void triggerNotification();  
 
+struct MessageParams {
+    String message;
+    String chatID;
+};
+
 /*
    The root certificate will be valid for years:
    *.telegram.org ->

@@ -5,6 +5,7 @@ bool servoMovingUp = true;
 bool servoActive = false;
 unsigned long previousMillis = 0;
 
+
 void setupServo() {
     pinMode(servoPin, OUTPUT);
     digitalWrite(servoPin, LOW); // Ensure servo is not powered initially
@@ -25,6 +26,11 @@ void updateServo() {
             if (servoPos <= servoMinAngle) {
                 servoMovingUp = true;
                 servoActive = false;  // Deactivate the servo after one complete cycle
+                if(!notificationSent) {
+                  triggerNotification();
+                  notificationSent = true;
+                }
+                
                 digitalWrite(servoPin, LOW); // Power off the servo
                 return;
             }

@@ -9,7 +9,7 @@ const int graphBufferLength = 160;
 const int maxGraphValue = 4095;
 const int graphHeight = 160;
 const int graphWidth = 160;    // Screen width
-const long cooldownPeriod = 5000;  // Cooldown period in milliseconds
+const long cooldownPeriod = 3000;  // Cooldown period in milliseconds
 
 // External variable declarations
 extern bool dingDongActive;
